@@ -31,6 +31,7 @@ func run() error {
 	if err := config.WriteConfig(msg); err != nil {
 		return err
 	}
+        // mount proc before mounting dev, symlinks might exist!
 	if err := config.MountDev(cfg.Dev); err != nil {
 		return err
 	}

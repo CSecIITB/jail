@@ -60,6 +60,7 @@ func (c *Config) SetConfig(msg *nsjail.NsJailConfig) {
 	msg.CgroupPidsMax = &c.Pids
 	msg.CgroupMemMax = proto.Uint64(uint64(c.Mem))
 	msg.CgroupCpuMsPerSec = &c.Cpu
+        msg.MountProc = proto.Bool(true)
 	msg.Mount = []*nsjail.MountPt{{
 		Src:    proto.String("/srv"),
 		Dst:    proto.String("/"),
@@ -102,10 +103,21 @@ func mountTmp() error {
 	return nil
 }
 
+func mountProc() error {
+        if err := unix.Mount("/proc", "/srv/proc", "proc", uintptr(0), "");
+        err != nil {
+            return fmt.Errorf("mount proc: %w", err)
+        }
+        return nil
+}
+
 func WriteConfig(msg *nsjail.NsJailConfig) error {
 	if err := mountTmp(); err != nil {
 		return err
 	}
+        if err := mountProc(); err != nil {
+                return err
+        }
 	content, err := prototext.Marshal(msg)
 	if err != nil {
 		return err

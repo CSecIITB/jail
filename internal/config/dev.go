@@ -9,6 +9,7 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+// possible symlinks as well
 func copyDev(name string) error {
 	src := "/dev/" + name
 	dst := "/srv/dev/" + name
@@ -16,10 +17,27 @@ func copyDev(name string) error {
 	if err := unix.Statx(0, src, 0, unix.STATX_TYPE|unix.STATX_MODE, stx); err != nil {
 		return fmt.Errorf("statx %s: %w", src, err)
 	}
-	t := stx.Mode & unix.S_IFMT
-	if t != unix.S_IFBLK && t != unix.S_IFCHR {
+	if t := stx.Mode & unix.S_IFMT; t != unix.S_IFBLK && t != unix.S_IFCHR {
 		return fmt.Errorf("not block or char device: %s", src)
 	}
+        if err := unix.Statx(0, src, unix.AT_SYMLINK_NOFOLLOW, unix.STATX_TYPE|unix.STATX_MODE, stx); err != nil {
+            return fmt.Errorf("statx-nofollow %s: %w", src, err)
+        }
+        t := stx.Mode & unix.S_IFMT
+        if t == unix.S_IFLNK {
+                linkDst, err := os.Readlink(src)
+                if err != nil {
+                    return err
+                }
+                if !path.IsAbs(linkDst) {
+                    return fmt.Errorf("non-absolute symlink : %s -> %s", src, linkDst)
+                }
+                // links are resolved at runtime!
+                if err := os.Symlink(linkDst, dst); err != nil {
+                    return err
+                }
+                return nil
+        }
 	if err := os.MkdirAll(path.Dir(dst), 0755); err != nil {
 		return err
 	}
